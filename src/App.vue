@@ -54,6 +54,13 @@ const updateLineFollowingStatusCombined = ref((status) => {
   }
 })
 
+// 防撞急停状态更新函数引用
+const updateEmergencyStopStatusCombined = ref((status) => {
+  if (robotParamsRef.value?.updateEmergencyStopStatus) {
+    robotParamsRef.value.updateEmergencyStopStatus(status)
+  }
+})
+
 function setUpdateRadar(fn) {
   updateRadarRef.value = fn
 }
@@ -91,6 +98,7 @@ const updateRadarCombined = ref((fl, fr, bl, br) => {
             :updateConnectionStatus="updateConnectionStatusCombined"
             :updateHostIp="updateHostIpCombined"
             :updateLineFollowingStatus="updateLineFollowingStatusCombined"
+            :updateEmergencyStopStatus="updateEmergencyStopStatusCombined"
           />
         </div>
       </el-main>

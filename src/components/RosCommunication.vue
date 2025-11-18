@@ -10,7 +10,8 @@ const props = defineProps({
   updateAngular: [Function, Object], // 角速度 z
   updateConnectionStatus: [Function, Object], // 连接状态
   updateHostIp: [Function, Object], // 上位机IP
-  updateLineFollowingStatus: [Function, Object] // 巡线状态
+  updateLineFollowingStatus: [Function, Object], // 巡线状态
+  updateEmergencyStopStatus: [Function, Object] // 防撞急停状态
 })
 
 let ros = null
@@ -18,9 +19,14 @@ let radarTopic = null
 let powerVoltageTopic = null
 let speedTopic = null
 let lineFollowingTopic = null
+let lineFollowingCycleTopic = null
+let emergencyStopTopic = null
 let clientsTopic = null
-// 当从 /connected_clients 成功获取到 IP 后，锁定，避免被本地 WebRTC 兜底覆盖
+// 当从 /connected_clients 成功获取到 IP 后，锁定,避免被本地 WebRTC 兜底覆盖
 let hostIpLocked = false
+// 用于跟踪两种巡线状态
+let onceFollowingStatus = false
+let cycleFollowingStatus = false
 let updateRadarFn = null
 let updateVoltageFn = null
 let updateSpeedFn = null
@@ -28,6 +34,7 @@ let updateAngularFn = null
 let updateConnectionStatusFn = null
 let updateHostIpFn = null
 let updateLineFollowingStatusFn = null
+let updateEmergencyStopStatusFn = null
 
 // 监听父组件传来的 updateRadar（函数或 ref）
 watch(
@@ -149,6 +156,24 @@ watch(
     } else {
       updateLineFollowingStatusFn = null
       console.log('RosCommunication: updateLineFollowingStatus not available yet')
+    }
+  },
+  { immediate: true }
+)
+
+// 监听父组件传来的 updateEmergencyStopStatus（函数或 ref）
+watch(
+  () => props.updateEmergencyStopStatus,
+  (val) => {
+    if (typeof val === 'function') {
+      updateEmergencyStopStatusFn = val
+      console.log('RosCommunication: received updateEmergencyStopStatus function')
+    } else if (val && typeof val === 'object' && typeof val.value === 'function') {
+      updateEmergencyStopStatusFn = val.value
+      console.log('RosCommunication: received updateEmergencyStopStatus ref')
+    } else {
+      updateEmergencyStopStatusFn = null
+      console.log('RosCommunication: updateEmergencyStopStatus not available yet')
     }
   },
   { immediate: true }
@@ -311,11 +336,49 @@ onMounted(() => {
         console.log('Subscribing to /start_follower_once_cmd (std_msgs/Bool)')
         lineFollowingTopic.subscribe((msg) => {
           if (msg && typeof msg.data === 'boolean') {
+            onceFollowingStatus = msg.data
+            // 更新总的巡线状态：任意一个为true则显示巡线中
             if (typeof updateLineFollowingStatusFn === 'function') {
-              updateLineFollowingStatusFn(msg.data)
+              updateLineFollowingStatusFn(onceFollowingStatus || cycleFollowingStatus)
             }
           } else {
-            console.warn('line_following_status message invalid:', msg)
+            console.warn('once_following_status message invalid:', msg)
+          }
+        })
+
+        // 循环巡线状态订阅：话题名为 /start_follower_cycle_cmd，消息类型为 std_msgs/Bool
+        lineFollowingCycleTopic = new ROSLIB.Topic({
+          ros,
+          name: '/start_follower_cycle_cmd',
+          messageType: 'std_msgs/Bool'
+        })
+        console.log('Subscribing to /start_follower_cycle_cmd (std_msgs/Bool)')
+        lineFollowingCycleTopic.subscribe((msg) => {
+          if (msg && typeof msg.data === 'boolean') {
+            cycleFollowingStatus = msg.data
+            // 更新总的巡线状态：任意一个为true则显示巡线中
+            if (typeof updateLineFollowingStatusFn === 'function') {
+              updateLineFollowingStatusFn(onceFollowingStatus || cycleFollowingStatus)
+            }
+          } else {
+            console.warn('cycle_following_status message invalid:', msg)
+          }
+        })
+
+        // 防撞急停状态订阅：话题名为 /radar_emergency_stop，消息类型为 std_msgs/Bool
+        emergencyStopTopic = new ROSLIB.Topic({
+          ros,
+          name: '/radar_emergency_stop',
+          messageType: 'std_msgs/Bool'
+        })
+        console.log('Subscribing to /radar_emergency_stop (std_msgs/Bool)')
+        emergencyStopTopic.subscribe((msg) => {
+          if (msg && typeof msg.data === 'boolean') {
+            if (typeof updateEmergencyStopStatusFn === 'function') {
+              updateEmergencyStopStatusFn(msg.data)
+            }
+          } else {
+            console.warn('emergency_stop_status message invalid:', msg)
           }
         })
 
@@ -380,6 +443,8 @@ onUnmounted(() => {
     if (speedTopic) speedTopic.unsubscribe()
     if (clientsTopic) clientsTopic.unsubscribe()
     if (lineFollowingTopic) lineFollowingTopic.unsubscribe()
+    if (lineFollowingCycleTopic) lineFollowingCycleTopic.unsubscribe()
+    if (emergencyStopTopic) emergencyStopTopic.unsubscribe()
   } catch (e) {
     console.warn('Error unsubscribing radar topic', e)
   }

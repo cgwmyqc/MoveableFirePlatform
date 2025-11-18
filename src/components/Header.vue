@@ -38,7 +38,7 @@ onMounted(() => {
 <template>
   <el-header>
     <div class="header-content">
-      <div class="header-left">移动载火平台控制软件</div>
+      <div class="header-left">移动载火平台控制系统</div>
       <div class="header-right">
         <div class="time-display">
           <div class="time-container">

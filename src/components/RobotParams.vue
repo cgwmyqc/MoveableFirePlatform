@@ -13,21 +13,34 @@ const connectionStatus = ref(false)
 // 巡线标志位状态
 const lineFollowingStatus = ref(false)
 
+// 防撞急停状态
+const emergencyStopStatus = ref(false)
+
 // 连接状态文字
 const connectionStatusText = computed(() => connectionStatus.value ? '已连接' : '未连接')
 
 // 连接状态类型
 const connectionStatusType = computed(() => connectionStatus.value ? 'success' : 'danger')
 
-// 巡线状态文字
-const lineFollowingStatusText = computed(() => lineFollowingStatus.value ? '巡线中' : '停  止')
+// 巡线状态文字：防撞急停优先显示
+const lineFollowingStatusText = computed(() => {
+  if (emergencyStopStatus.value) {
+    return '防撞急停'
+  }
+  return lineFollowingStatus.value ? '巡线中' : '停  止'
+})
 
 // 巡线状态类型
 const lineFollowingStatusType = computed(() => lineFollowingStatus.value ? 'success' : 'info')
 
 // 徽章配色：与电池电量徽章一致的三档（ok/low/warn）
 const connectionBadgeClass = computed(() => connectionStatus.value ? 'ok' : 'warn')
-const lineBadgeClass = computed(() => lineFollowingStatus.value ? 'ok' : 'low')
+const lineBadgeClass = computed(() => {
+  if (emergencyStopStatus.value) {
+    return 'warn' // 防撞急停使用红色警告样式
+  }
+  return lineFollowingStatus.value ? 'ok' : 'low'
+})
 
 // 更新连接状态
 const updateConnectionStatus = (status) => {
@@ -44,10 +57,16 @@ const updateLineFollowingStatus = (status) => {
   lineFollowingStatus.value = status
 }
 
+// 更新防撞急停状态
+const updateEmergencyStopStatus = (status) => {
+  emergencyStopStatus.value = status
+}
+
 defineExpose({
   updateConnectionStatus,
   updateHostIp,
-  updateLineFollowingStatus
+  updateLineFollowingStatus,
+  updateEmergencyStopStatus
 })
 </script>
 

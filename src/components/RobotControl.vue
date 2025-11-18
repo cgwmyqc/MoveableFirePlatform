@@ -6,10 +6,13 @@ const ROSLIB = window.ROSLIB
 let ros = null
 let followerTopic = null
 let followerCycleTopic = null
+let radarEnableTopic = null
 
 // 巡线状态
 const isPatrolling = ref(false)
 const isCyclePatrolling = ref(false)
+// 雷达防撞使能状态
+const radarEnabled = ref(true)
 
 // 初始化ROS连接
 const initROS = () => {
@@ -51,6 +54,16 @@ const initFollowerTopic = () => {
       messageType: 'std_msgs/msg/Bool'
     })
     console.log('循环巡线话题已初始化')
+    
+    radarEnableTopic = new ROSLIB.Topic({
+      ros: ros,
+      name: '/radar_enable',
+      messageType: 'std_msgs/msg/Bool'
+    })
+    console.log('雷达防撞使能话题已初始化')
+    
+    // 初始化时发送默认开启状态
+    publishRadarEnable(radarEnabled.value)
   } catch (error) {
     console.error('巡线话题初始化失败:', error)
   }
@@ -106,6 +119,29 @@ const publishCycleFollowerCommand = (isActive) => {
   }
 }
 
+// 发布雷达防撞使能命令
+const publishRadarEnable = (isEnabled) => {
+  if (!ros?.isConnected) {
+    console.error('ROS未连接')
+    return
+  }
+
+  if (!radarEnableTopic) {
+    console.error('雷达防撞使能话题未初始化')
+    return
+  }
+
+  try {
+    const message = new ROSLIB.Message({
+      data: Boolean(isEnabled)
+    })
+    radarEnableTopic.publish(message)
+    console.log('已发送雷达防撞使能命令:', isEnabled)
+  } catch (error) {
+    console.error('发送雷达防撞使能命令失败:', error)
+  }
+}
+
 // 处理单次巡线按钮点击
 const handlePatrolClick = () => {
   // 如果循环巡线正在运行，不允许启动单次巡线
@@ -130,6 +166,12 @@ const handleCyclePatrolClick = () => {
   isCyclePatrolling.value = !isCyclePatrolling.value
   console.log(`循环巡线命令: ${isCyclePatrolling.value ? '开始' : '停止'}`)
   publishCycleFollowerCommand(isCyclePatrolling.value)
+}
+
+// 处理雷达防撞使能切换
+const handleRadarEnableChange = (value) => {
+  console.log(`雷达防撞使能: ${value ? '开启' : '关闭'}`)
+  publishRadarEnable(value)
 }
 
 onMounted(() => {
@@ -173,6 +215,14 @@ onUnmounted(() => {
           >
             {{ isCyclePatrolling ? '停止循环巡线' : '开始循环巡线' }}
           </el-button>
+          <div style="display: inline-flex; align-items: center; margin-left: 24px;">
+            <span style="margin-right: 8px; color: var(--vt-c-text-dark-1);">雷达防撞使能</span>
+            <el-switch
+              v-model="radarEnabled"
+              @change="handleRadarEnableChange"
+              style="--el-switch-on-color: #67c23a;"
+            />
+          </div>
         </el-card>
       </el-col>
     </el-row>
